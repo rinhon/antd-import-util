@@ -2,8 +2,9 @@ import "@ant-design/v5-patch-for-react-19";
 import React, { useState, useEffect } from "react";
 import { InboxOutlined } from "@ant-design/icons";
 import type { UploadFile, UploadProps } from "antd";
-import { message, Upload, Button, Space, Progress, Card, List } from "antd";
+import { message, Upload, Button, Space, Progress, Card, List, Table, Tag } from "antd";
 import { wsManager, type WebSocketMessage } from "./utils/WebSocketManager";
+import { API_CONFIG } from "./config/config";
 
 const { Dragger } = Upload;
 
@@ -13,6 +14,14 @@ interface ProcessingStatus {
   progress: number;
   status: "waiting" | "processing" | "completed" | "error" | "cancelled";
   message?: string;
+}
+
+interface TaskResult {
+  taskId: string;
+  fileName: string;
+  status: "completed" | "error" | "cancelled";
+  message?: string;
+  timestamp: string;
 }
 
 
@@ -27,6 +36,7 @@ const App: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [processingTasks, setProcessingTasks] = useState<ProcessingStatus[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const [taskResults, setTaskResults] = useState<TaskResult[]>([]);
   // 在组件中定义一个状态存储 sessionId
   const [sessionIddata, setSessionId] = useState<string>('');
 
@@ -66,7 +76,14 @@ const App: React.FC = () => {
               : task
           )
         );
-        message.success(`文件 ${data.fileName} 处理完成`);
+        // 添加到结果列表
+        setTaskResults(prev => [...prev, {
+          taskId: data.taskId,
+          fileName: data.fileName,
+          status: "completed",
+          message: data.message || "处理完成",
+          timestamp: new Date().toLocaleString()
+        }]);
       } else if (data.type === "error") {
         // 错误
         setProcessingTasks((prev) =>
@@ -76,7 +93,14 @@ const App: React.FC = () => {
               : task
           )
         );
-        message.error(`文件 ${data.fileName} 处理失败: ${data.message}`);
+        // 添加到结果列表
+        setTaskResults(prev => [...prev, {
+          taskId: data.taskId,
+          fileName: data.fileName,
+          status: "error",
+          message: data.message,
+          timestamp: new Date().toLocaleString()
+        }]);
       } else if (data.type === "cancelled") {
         // 任务取消
         setProcessingTasks((prev) =>
@@ -86,6 +110,14 @@ const App: React.FC = () => {
               : task
           )
         );
+        // 添加到结果列表
+        setTaskResults(prev => [...prev, {
+          taskId: data.taskId,
+          fileName: data.fileName,
+          status: "cancelled",
+          message: "任务已取消",
+          timestamp: new Date().toLocaleString()
+        }]);
       }
     };
 
@@ -141,7 +173,7 @@ const App: React.FC = () => {
         formData.append("files", file as unknown as File);
       });
 
-      const response = await fetch("http://localhost:8081/fileUpload/multipleFiles", {
+      const response = await fetch(API_CONFIG.upload.multipleFiles, {
         method: "POST",
         headers: {
           "Session-Id": sessionIddata, // 使用存储的 sessionId
@@ -232,47 +264,71 @@ const App: React.FC = () => {
     }
   };
 
-  const cancelTask = async (taskId: string) => {
+  // const cancelTask = async (taskId: string) => {
+  //   try {
+  //     const response = await fetch(
+  //       API_CONFIG.tasks.cancel(taskId),
+  //       {
+  //         method: "DELETE",
+  //       }
+  //     );
+  //     const result = await response.json();
+
+  //     if (result.success) {
+  //       message.success("任务已取消");
+  //     } else {
+  //       message.error("取消任务失败");
+  //     }
+  //   } catch {
+  //     message.error("取消任务失败");
+  //   }
+  // };
+
+  // const cancelAllTasks = async () => {
+  //   try {
+  //     const response = await fetch(API_CONFIG.tasks.base, {
+  //       method: "DELETE",
+  //     });
+  //     const result = await response.json();
+
+  //     if (result.success) {
+  //       message.success("所有任务已取消");
+  //     } else {
+  //       message.error("取消任务失败");
+  //     }
+  //   } catch {
+  //     message.error("取消任务失败");
+  //   }
+  // };
+  
+  // 下载错误报告
+  const downloadErrorReport = async () => {
     try {
-      const response = await fetch(
-        `http://localhost:8081/api/tasks/${taskId}`,
-        {
-          method: "DELETE",
-        }
-      );
-      const result = await response.json();
-
-      if (result.success) {
-        message.success("任务已取消");
-      } else {
-        message.error("取消任务失败");
-      }
-    } catch {
-      message.error("取消任务失败");
-    }
-  };
-
-  const cancelAllTasks = async () => {
-    try {
-      const response = await fetch(`http://localhost:8081/api/tasks`, {
-        method: "DELETE",
-      });
-      const result = await response.json();
-
-      if (result.success) {
-        message.success("所有任务已取消");
-      } else {
-        message.error("取消任务失败");
-      }
-    } catch {
-      message.error("取消任务失败");
+      // 创建一个a标签用于下载
+      const link = document.createElement('a');
+      // 设置下载链接，预留参数位置
+      link.href = API_CONFIG.excel.downloadErrorReport;
+      // 设置下载文件名
+      link.download = `错误报告_${new Date().toISOString().split('T')[0]}.xlsx`;
+      // 添加到body
+      document.body.appendChild(link);
+      // 模拟点击
+      link.click();
+      // 移除a标签
+      document.body.removeChild(link);
+      
+      message.success("开始下载错误报告");
+    } catch (error) {
+      console.error("下载错误报告失败:", error);
+      message.error("下载错误报告失败");
     }
   };
 
   return (
-    <Space direction="horizontal" style={{ width: "100%" }} size="large" align="center">
+    <Space direction="horizontal" style={{ width: "100%", padding: "20px" }} size="large" align="start">
       <Card
         title="文件上传"
+        style={{ maxWidth: "800px", margin: "0 auto" }}
         extra={
           <span style={{
             color: wsConnected ? '#52c41a' : '#f5222d',
@@ -286,9 +342,9 @@ const App: React.FC = () => {
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>
-          <p className="ant-upload-text">点击或拖拽上传文件</p>
+          <p className="ant-upload-text">点击或拖拽上传文件夹</p>
           <p className="ant-upload-hint">
-            支持 .xls, .xlsx 格式的文件，最多可选择5个文件
+            支持 .xls, .xlsx 格式的文件，
           </p>
         </Dragger>
         <Button
@@ -304,41 +360,13 @@ const App: React.FC = () => {
 
       {processingTasks.length > 0 && (
         <Card 
-          style={{ width: "100%" }}
+          style={{ maxWidth: "800px", margin: "0 auto" }}
           title="处理进度"
-          extra={
-            <Button
-              danger
-              size="small"
-              onClick={cancelAllTasks}
-              disabled={
-                !processingTasks.some(
-                  (task) =>
-                    task.status === "processing" || task.status === "waiting"
-                )
-              }
-            >
-              取消所有任务
-            </Button>
-          }
         >
           <List 
             dataSource={processingTasks}
-            renderItem={(task, index) => (
-              <List.Item
-                
-                actions={[
-                  task.status === "processing" || task.status === "waiting" ? (
-                    <Button
-                      size="small"
-                      danger
-                      onClick={() => cancelTask(task.taskId)}
-                    >
-                      取消
-                    </Button>
-                  ) : null,
-                ].filter(Boolean)}
-              >
+            renderItem={(task) => (
+              <List.Item>
                 <div style={{ width: "100%" }}>
                   <div
                     style={{
@@ -350,7 +378,7 @@ const App: React.FC = () => {
                   >
                     <div>
                       <strong>
-                        #{index + 1} {task.fileName}
+                        {task.fileName}
                       </strong>
                       {task.status === "processing" && (
                         <span style={{ marginLeft: 8, color: "#1890ff" }}>
@@ -369,7 +397,9 @@ const App: React.FC = () => {
                         fontSize: "12px",
                       }}
                     >
-                      {task.message}
+                      {task.status === "completed" && "已完成"}
+                      {task.status === "error" && "处理出错"}
+                      {task.status === "cancelled" && "已取消"}
                     </span>
                   </div>
                   <Progress
@@ -380,6 +410,105 @@ const App: React.FC = () => {
                 </div>
               </List.Item>
             )}
+          />
+        </Card>
+      )}
+
+      {/* 任务结果表格 */}
+      {taskResults.length > 0 && (
+        <Card 
+          style={{ maxWidth: "800px", margin: "0 auto" }}
+          title="处理结果"
+          extra={
+            <Space>
+              {/* 只有存在错误结果时才显示下载错误报告按钮 */}
+              {taskResults.some(task => task.status === 'error') && (
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={downloadErrorReport}
+                >
+                  下载错误报告
+                </Button>
+              )}
+              <Button
+                size="small"
+                onClick={() => {
+                  setTaskResults([]);
+                  setProcessingTasks([]);
+                }}
+              >
+                清空记录
+              </Button>
+            </Space>
+          }
+        >
+          <Table 
+            dataSource={taskResults}
+            rowKey="taskId"
+            pagination={{ pageSize: 5 }}
+            columns={[
+              {
+                title: '文件名',
+                dataIndex: 'fileName',
+                key: 'fileName',
+              },
+              {
+                title: '状态',
+                dataIndex: 'status',
+                key: 'status',
+                render: (status: string) => {
+                  let color = '';
+                  let text = '';
+                  
+                  switch(status) {
+                    case 'completed':
+                      color = 'success';
+                      text = '完成';
+                      break;
+                    case 'error':
+                      color = 'error';
+                      text = '错误';
+                      break;
+                    case 'cancelled':
+                      color = 'default';
+                      text = '已取消';
+                      break;
+                    default:
+                      color = 'processing';
+                      text = status;
+                  }
+                  
+                  return <Tag color={color}>{text}</Tag>;
+                }
+              },
+              {
+                title: '消息',
+                dataIndex: 'message',
+                key: 'message',
+                ellipsis: true,
+                render: (text: string) => (
+                  <span 
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => {
+                      if (text) {
+                        navigator.clipboard.writeText(text)
+                          .then(() => message.success('消息已复制到剪贴板'))
+                          .catch(() => message.error('复制失败'));
+                      }
+                    }}
+                    title="点击复制消息内容"
+                  >
+                    {text}
+                  </span>
+                ),
+              },
+              {
+                title: '时间',
+                dataIndex: 'timestamp',
+                key: 'timestamp',
+              }
+            ]}
           />
         </Card>
       )}

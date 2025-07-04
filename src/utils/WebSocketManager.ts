@@ -170,4 +170,6 @@ class WebSocketManager {
 }
 
 // 导出单例实例
-export const wsManager = new WebSocketManager('ws://localhost:8081/ws');
+import { API_CONFIG } from '../config/config';
+
+export const wsManager = new WebSocketManager(API_CONFIG.ws.url);

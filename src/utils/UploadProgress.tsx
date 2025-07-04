@@ -6,8 +6,18 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 interface UploadProgress {
   filename: string;
   percent: number;
-  status: 'active' | 'success' | 'exception';
+  // status: "success" | "exception" | "active" | "uploading" | "pending" | "canceled"; // 添加你使用的所有其他状态
+  status: string; 
 }
+const UploadStatusData = {
+  success: 'success',
+  exception: 'exception',
+  active: 'active',
+  uploading: 'uploading',
+  pending: 'pending',
+  canceled: 'canceled',
+} as const;
+
 
 const UploadProgress: React.FC = () => {
   const location = useLocation();
@@ -27,7 +37,7 @@ const UploadProgress: React.FC = () => {
 
   const startUpload = () => {
     setUploading(true);
-    setProgressData(files.map(filename => ({
+    setProgressData(files.map((filename: string) => ({
       filename,
       percent: 0,
       status: 'active'
@@ -35,15 +45,15 @@ const UploadProgress: React.FC = () => {
 
     // 模拟从服务端获取进度
     const interval = setInterval(() => {
-      setProgressData(prev => {
-        const newData = prev.map(item => {
+      setProgressData((prev) => {
+        const newData = prev.map((item) => {
           if (item.percent < 100) {
             const increment = Math.floor(Math.random() * 10) + 5;
             const newPercent = Math.min(item.percent + increment, 100);
             return {
               ...item,
               percent: newPercent,
-              status: newPercent === 100 ? 'success' : 'active'
+              status: newPercent === 100 ? UploadStatusData.success : UploadStatusData.active
             };
           }
           return item;
@@ -80,7 +90,7 @@ const UploadProgress: React.FC = () => {
                 <div>{item.filename}</div>
                 <Progress 
                   percent={item.percent} 
-                  status={item.status}
+                  status={item.status as "success" | "exception" | "active" | "normal" | undefined}
                   strokeColor={item.status === 'success' ? '#52c41a' : undefined}
                 />
               </Space>

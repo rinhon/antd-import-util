@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import App from "./App";
-import UploadProgress from "./utils/upload-progress";
+import App from "../App";
+import UploadProgress from "../utils/UploadProgress";
 
 const AppRouter = () => {
   return (
